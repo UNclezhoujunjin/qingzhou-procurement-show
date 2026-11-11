@@ -69,6 +69,28 @@ npm.cmd run dev
 
 管理员也能对其他人的申请依次审批、下单、收货。首次初始化含 8 个商品、3 家供应商、6 笔申请、1 笔待收货订单和期初库存流水。
 
+## 轻舟智能体
+
+登录后从顶部打开「轻舟智能体」。先点「低库存商品」，选择一件商品查看现存量、安全库存缺口、可见待到货量和参考补货量。也可以输入「查一下办公纸库存和在途数量」。有权限的用户可将商品带入补货表单，提交和审批继续走原有流程。
+
+快捷查询由后端直接执行。自然语言模式需要在启动应用前设置 `QINGZHOU_AI_API_KEY`。可用 `QINGZHOU_AI_MODEL` 和 `QINGZHOU_AI_ENDPOINT` 指定模型和 HTTPS 接口。模型负责选择工具，Spring Boot 校验计划并按当前用户权限查询业务数据。模型超时或返回无效计划时，页面会提示，可继续使用快捷查询。
+
+### 运行真实模型评测
+
+在一个新的 PowerShell 窗口执行以下命令。评测默认使用独立的内存 H2 和合成商品，向模型发送固定测试问句。密钥通过隐藏输入读取，仅在当前终端的进程环境中使用。请确认当前终端没有设置 `TEST_DB_URL`，以免接入自定义测试数据库。
+
+```powershell
+$env:QINGZHOU_AI_API_KEY = [System.Net.NetworkCredential]::new('', (Read-Host '模型 API Key' -AsSecureString)).Password
+$env:QINGZHOU_AI_LIVE_EVAL = '1'
+try {
+    mvn.cmd -f backend/pom.xml -s backend/settings.xml -gs backend/settings.xml "-Dmaven.repo.local=$PWD/.cache/m2" "-Dtest=UsabilityPolishTest#liveInventoryAgentEvaluation" test
+} finally {
+    Remove-Item Env:QINGZHOU_AI_API_KEY,Env:QINGZHOU_AI_LIVE_EVAL
+}
+```
+
+输出包含单商品补货、低库存、当前待办和商品重名四个用例的预期工具、实际工具、状态、耗时和通过数。常规构建会跳过外部模型调用，同时验证模拟超时、无效计划及快捷查询恢复路径。评测耗时反映测试机到模型接口的单次响应，可用于复现实验。
+
 ## 已实现
 
 - 密码哈希、会话 Cookie 登录、CSRF 防护、退出与会话过期处理。
@@ -133,15 +155,19 @@ cd frontend
 npm.cmd run build
 ```
 
-后端 32 项测试覆盖原有权限、登录、申请与库存规则，以及多商品拆单、分批收货/退货/补货、并发收货、盘点冲突、领用归还、个人资料和密码、通知隔离、在线备份与快照恢复及云部署配置校验。业务测试使用独立数据库，备份恢复使用测试目录中的文件数据库，不改变本地业务数据。
+后端测试覆盖权限、登录、申请与库存规则，多商品拆单、分批收退货、并发收货、盘点、归还、个人资料、密码、通知、备份恢复和云部署校验。密码最低长度为 8 字符；服务器密码恢复步骤见 [密码恢复说明](docs/password-recovery.md)。业务测试使用独立数据库，不改变本地业务数据。
 
 CI 已配置 H2 测试和 PostgreSQL 测试任务。要在独立 PostgreSQL 测试库运行相同测试，设置 `TEST_DB_URL`、`DB_USER`、`DB_PASSWORD`；测试库必须为空且可被写入，不能指向业务数据库。
 
 ## PostgreSQL 与 Docker
 
-尽量免费的公网部署方案已准备为 Cloudflare 域名 + Render Free + Neon Free，目标子域名 `erp.wszjj.me`。步骤与限制见 [免费云部署说明](docs/cloud-free-deployment.md)。配置文件准备完成不代表已经部署，云端账号授权、数据库与 DNS 验证仍需完成。
+线上业务应用采用阿里云 Ubuntu 服务器，由 Nginx 提供 HTTPS，Spring Boot 和 PostgreSQL 在服务器本机运行。站点配置、证书和更新步骤见 [阿里云上线流程](docs/public-launch.md)。
 
-安装 Docker 后，复制 `.env.example` 为 `.env`，填写数据库密码与至少 12 位的管理员初始密码，再运行：
+服务器上的模型配置写在 `/etc/qingzhou/server.env`。编辑后执行 `sudo systemctl restart qingzhou`，再从智能体入口测试真实问句。遇到上游错误可用 `sudo journalctl -u qingzhou --since "10 minutes ago" --no-pager` 查看 `Inventory AI` 日志。
+
+仓库也保留 [Render 与 Neon 免费云部署方案](docs/cloud-free-deployment.md)。
+
+安装 Docker 后，复制 `.env.example` 为 `.env`，填写数据库密码与至少 8 位的管理员初始密码，再运行：
 
 ```powershell
 docker compose up --build -d
@@ -161,4 +187,3 @@ docker compose up --build -d
 - 容器、PostgreSQL、真实负载和公网发布尚未在这台电脑验证。本机备份仅能防止数据误操作，需另行保留异盘副本以应对磁盘故障。
 
 建议下一步按业务需要增加采购取消/退款、预算与对账、正式部门实体和服务端分页，再考虑多租户或消息队列。
-

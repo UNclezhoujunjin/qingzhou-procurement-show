@@ -23,8 +23,8 @@ class SeedData implements CommandLineRunner {
     public void run(String... args) {
         if (db.queryForObject("SELECT COUNT(*) FROM app_user", Long.class) > 0) return;
         if (!demo) {
-            if (bootstrap.length()<12 || bootstrap.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>72)
-                throw new IllegalStateException("首次启动请设置至少 12 字符且不超过 72 字节的 BOOTSTRAP_ADMIN_PASSWORD");
+            if (bootstrap.length()<8 || bootstrap.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>72)
+                throw new IllegalStateException("首次启动请设置至少 8 字符且不超过 72 字节的 BOOTSTRAP_ADMIN_PASSWORD");
             user("admin", bootstrap, "系统管理员", "管理中心", "ADMIN");
             return;
         }

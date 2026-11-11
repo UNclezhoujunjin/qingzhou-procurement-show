@@ -18,8 +18,8 @@ class CloudSafetyConfig {
             if(environment.getProperty("DB_USER","").isBlank()||environment.getProperty("DB_PASSWORD","").isBlank())
                 throw new IllegalStateException("Set DB_USER and DB_PASSWORD as private deployment environment variables.");
             String password=environment.getProperty("BOOTSTRAP_ADMIN_PASSWORD","");
-            if(password.length()<12||password.getBytes(StandardCharsets.UTF_8).length>72||password.equals("Qingzhou@2026"))
-                throw new IllegalStateException("Set a new private BOOTSTRAP_ADMIN_PASSWORD with at least 12 characters and at most 72 UTF-8 bytes; do not use the demo password.");
+            if(password.length()<8||password.getBytes(StandardCharsets.UTF_8).length>72||password.equals("Qingzhou@2026"))
+                throw new IllegalStateException("Set a new private BOOTSTRAP_ADMIN_PASSWORD with at least 8 characters and at most 72 UTF-8 bytes; do not use the demo password.");
             if(environment.getProperty("app.demo",Boolean.class,false))throw new IllegalStateException("Demo mode cannot be enabled in the cloud profile.");
         };
     }

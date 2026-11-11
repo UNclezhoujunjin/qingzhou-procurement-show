@@ -21,7 +21,7 @@ class WorkController {
     record CountLineInput(@Positive long productId,@Min(0) @Max(100000000) int countedQuantity,@Min(0) int stockVersion){}
     record CountInput(@NotEmpty @Size(max=100) List<@NotNull @Valid CountLineInput> lines,@NotBlank @Size(max=300) String reason){}
     record ProfileInput(@NotBlank @Size(max=64) String name,@NotNull @Email @Size(max=160) String email,@NotNull @Size(max=32) String phone,@NotNull @Min(0) Integer version){}
-    record PasswordInput(@NotBlank @Size(max=256) String currentPassword,@NotBlank @Size(min=12,max=64) String newPassword){}
+    record PasswordInput(@NotBlank @Size(max=256) String currentPassword,@NotBlank @Size(min=8,max=64) String newPassword){}
 
     @PostMapping("/orders/{id}/receive") Map<String,?> receive(Authentication auth,@PathVariable String id,
         @Valid @RequestBody(required=false) FulfillmentInput input,@RequestHeader(value="Idempotency-Key",required=false) String key) {
@@ -42,7 +42,7 @@ class WorkController {
     @PostMapping("/notifications/read-all") Map<String,String> readAll(Authentication auth){notifications.readAll(accounts.current(auth));return Map.of("message","全部通知已标为已读");}
     @PostMapping("/notifications/{id}/read") Map<String,String> read(Authentication auth,@PathVariable String id){notifications.read(accounts.current(auth),id);return Map.of("message","通知已读");}
     @GetMapping("/profile") Map<String,Object> profile(Authentication auth){return people.profile(accounts.current(auth));}
-    @PutMapping("/profile") Map<String,String> profile(Authentication auth,@Valid @RequestBody ProfileInput input,HttpServletRequest request){people.profile(accounts.current(auth),input);signOut(request);return Map.of("message","资料已保存，请重新登录");}
+    @PutMapping("/profile") Map<String,String> profile(Authentication auth,@Valid @RequestBody ProfileInput input,HttpServletRequest request){people.profile(accounts.current(auth),input);return Map.of("message","个人资料已保存");}
     @PostMapping("/profile/password") Map<String,String> password(Authentication auth,@Valid @RequestBody PasswordInput input,HttpServletRequest request){people.password(accounts.current(auth),input);signOut(request);return Map.of("message","密码已更新，请使用新密码登录");}
     private void signOut(HttpServletRequest request){var session=request.getSession(false);if(session!=null)session.invalidate();SecurityContextHolder.clearContext();}
 }

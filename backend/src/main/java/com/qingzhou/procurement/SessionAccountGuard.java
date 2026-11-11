@@ -16,7 +16,11 @@ class SessionAccountGuard implements WebMvcConfigurer {
     @Override public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new HandlerInterceptor() {
             @Override public boolean preHandle(HttpServletRequest request,HttpServletResponse response,Object handler) {
-                try { accounts.current(SecurityContextHolder.getContext().getAuthentication()); }
+                try {
+                    var a=accounts.current(SecurityContextHolder.getContext().getAuthentication());
+                    boolean allowed=request.getRequestURI().equals("/api/auth/me")||request.getRequestURI().equals("/api/profile/password")||request.getRequestURI().equals("/api/profile")&&request.getMethod().equals("GET");
+                    if(a.mustChangePassword()&&!allowed)throw new BusinessError(403,"请先在个人中心修改管理员重置的密码");
+                }
                 catch(BusinessError e) {
                     if(e.status==401) {
                         var session=request.getSession(false);

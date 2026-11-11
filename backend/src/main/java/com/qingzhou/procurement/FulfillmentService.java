@@ -33,6 +33,8 @@ class FulfillmentService {
         var request=writes.one("SELECT * FROM purchase_request WHERE id=? FOR UPDATE",parent.get("request_id"));
         var order=writes.one("SELECT * FROM purchase_order WHERE id=? FOR UPDATE",id);
         if(input!=null&&input.version()!=((Number)order.get("version")).intValue())throw new BusinessError(409,"订单已更新，请刷新后核对收货或退货数量");
+        if(!order.get("lifecycle_state").equals("ACTIVE")&&(!returning||!order.get("lifecycle_state").equals("TERMINATED")))
+            throw new BusinessError(409,"订单已结束，不能继续收货");
         var items=lines.orders(id);
         if(input==null)for(var line:items){int remaining=((Number)line.get("remaining")).intValue();if(remaining>0)selected.put(line.get("id").toString(),remaining);}
         var known=new HashSet<String>();items.forEach(l->known.add(l.get("id").toString()));
@@ -54,8 +56,7 @@ class FulfillmentService {
         String state=full?"RECEIVED":net>0?"PARTIAL":anyReturn?"RETURNED":"OPEN";
         if(!selected.isEmpty()) {
             writes.db.update("UPDATE purchase_order SET status=?,fulfillment_status=?,version=version+1,received_at="+(full?"CURRENT_TIMESTAMP":"NULL")+" WHERE id=?",full?"RECEIVED":"OPEN",state,id);
-            long remaining=writes.db.queryForObject("SELECT COUNT(*) FROM purchase_order WHERE request_id=? AND status<>'RECEIVED'",Long.class,request.get("id"));
-            writes.db.update("UPDATE purchase_request SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",remaining==0?"RECEIVED":"ORDERED",request.get("id"));
+            writes.reconcileRequest(request.get("id").toString());
             writes.audit(a,returning?"采购退货":"采购收货入库",order.get("number").toString(),"明细 "+selected.size()+" 项；"+reason);
             notifications.user(((Number)request.get("applicant_id")).longValue(),returning?"采购物资发生退货":full?"采购订单已收齐":"采购订单分批到货",order.get("number")+"；"+reason,"requests");
             notifications.user(((Number)order.get("buyer_id")).longValue(),returning?"采购订单需要跟进补货":"采购订单收货进展",order.get("number")+"；"+state,"orders");

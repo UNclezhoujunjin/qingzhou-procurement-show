@@ -121,7 +121,7 @@ class EditingIntegrationTest {
         var newSession=login(username);
         mvc.perform(get("/api/orders").session(newSession)).andExpect(status().isOk());
         mvc.perform(post("/api/requests").session(newSession).with(csrf()).header("Idempotency-Key",UUID.randomUUID().toString())
-            .contentType("application/json").content("{\"productId\":1,\"quantity\":1,\"reason\":\"不允许提交\"}"))
+            .contentType("application/json").content("{\"approverId\":1,\"productId\":1,\"quantity\":1,\"reason\":\"不允许提交\"}"))
             .andExpect(status().isForbidden());
         int version=db.queryForObject("SELECT version FROM app_user WHERE id=1",Integer.class);
         updateUser(1,new ApiController.UserUpdateInput("管理员","管理中心","ADMIN",false,version),409);

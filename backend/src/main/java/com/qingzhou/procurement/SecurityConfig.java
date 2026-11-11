@@ -16,9 +16,9 @@ class SecurityConfig {
     @Bean PasswordEncoder passwords() { return new BCryptPasswordEncoder(); }
 
     @Bean UserDetailsService users(JdbcTemplate db) {
-        return username -> db.query("SELECT * FROM app_user WHERE username=?", (rs, n) ->
+        return username -> db.query("SELECT * FROM app_user WHERE username=? AND deleted=FALSE", (rs, n) ->
             new StoredUser(rs.getString("username"),rs.getString("password_hash"),rs.getString("role"),
-                rs.getBoolean("enabled"),rs.getInt("version")), username)
+                rs.getBoolean("enabled"),rs.getInt("auth_epoch")), username)
             .stream().findFirst().orElseThrow(() -> new UsernameNotFoundException("账号不存在"));
     }
 
@@ -40,8 +40,11 @@ class SecurityConfig {
 
 class StoredUser extends User {
     final int version;
+    final String passwordMarker;
     StoredUser(String username,String password,String role,boolean enabled,int version) {
         super(username,password,enabled,true,true,true,java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_"+role)));
         this.version=version;
+        this.passwordMarker=marker(password);
     }
+    static String marker(String hash){try{return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(hash.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(Exception e){throw new IllegalStateException(e);}}
 }

@@ -15,5 +15,7 @@ class CloudSafetyTest {
     @Test void rejectsUnencryptedPostgres(){runner.withPropertyValues("DB_URL=jdbc:postgresql://example.neon.tech/neondb").run(context->assertThat(context).hasFailed());}
     @Test void rejectsThePublicDemoPassword(){runner.withPropertyValues("BOOTSTRAP_ADMIN_PASSWORD=Qingzhou@2026").run(context->assertThat(context).hasFailed());}
     @Test void rejectsMissingDatabaseCredentials(){runner.withPropertyValues("DB_PASSWORD=").run(context->assertThat(context).hasFailed());}
+    @Test void acceptsEightCharacterBootstrapPassword(){runner.withPropertyValues("BOOTSTRAP_ADMIN_PASSWORD=Test123!").run(context->assertThat(context).hasNotFailed());}
+    @Test void rejectsSevenCharacterBootstrapPassword(){runner.withPropertyValues("BOOTSTRAP_ADMIN_PASSWORD=Test12!").run(context->assertThat(context).hasFailed());}
     @Test void rejectsCloudDemoMode(){runner.withPropertyValues("app.demo=true").run(context->assertThat(context).hasFailed());}
 }

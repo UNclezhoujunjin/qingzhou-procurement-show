@@ -43,7 +43,7 @@
 | POST | /inventory/issues/{id}/return | ADMIN / WAREHOUSE；领用归还，需幂等 key |
 | GET, POST | /inventory/counts | ADMIN / WAREHOUSE；盘点记录与差异调整，写入需幂等 key |
 | GET | /profile | 本人的资料、联系方式和版本 |
-| PUT | /profile | 本人修改姓名、邮箱和电话；成功后退出登录 |
+| PUT | /profile | 本人修改姓名、邮箱和电话；成功后保持登录，资料版本递增 |
 | POST | /profile/password | 校验当前密码后修改；成功后所有旧登录失效 |
 | GET | /notifications | 本人通知，page/size/unread 筛选 |
 | POST | /notifications/{id}/read | 本人通知标已读 |
@@ -63,8 +63,10 @@
 创建采购申请（最多 100 项不同商品，各数量 1～100000，用途不超过 500 字）：
 
 ```json
-{"lines":[{"productId":1,"quantity":3},{"productId":2,"quantity":3}],"reason":"新增研发工位"}
+{"lines":[{"productId":1,"quantity":3},{"productId":2,"quantity":3}],"reason":"新增研发工位","approverId":3}
 ```
+
+审批负责人 ID 必须从 `GET /requests/approvers` 的候选人员中选择；示例 ID 仅用于说明。候选为启用且无需强制改密的其他管理员、同部门主管。无人可选时先保存草稿并配置审批人员。新申请仅指定负责人可审批；历史未指定的单据保留原角色/部门规则。
 
 审批（decision 仅 APPROVED / REJECTED；驳回时 note 必填）：
 
@@ -90,7 +92,7 @@
 {"name":"示例供应商有限公司","contact":"李经理","phone":"0571-88001234"}
 ```
 
-创建成员（username 为 3～64 位字母、数字、下划线或短横线；密码 12～64 字符且 UTF-8 不超过 72 字节）：
+创建成员（username 为 3～64 位字母、数字、下划线或短横线；密码 8～64 字符且 UTF-8 不超过 72 字节）：
 
 ```json
 {"username":"new_employee","name":"示例员工","department":"产品研发部","role":"EMPLOYEE","password":"ExampleOnly@2026"}
@@ -136,8 +138,18 @@ stockVersion 必须使用商品返回的 stock_version，期间库存变化会�
 
 领用归还向原领用流水 ID 提交 `{"quantity":1,"reason":"工位调整，归还仓库"}`。以上写入均需幂等 key。库存流水返回 business_type，可区分 OPENING、ISSUE、PURCHASE_RECEIPT、PURCHASE_RETURN、ISSUE_RETURN、COUNT_ADJUSTMENT。
 
-## 个人中心
+## 删除团队成员
+
+POST `/users/{id}/remove`，仅管理员，需 CSRF 和 `Idempotency-Key`。
+
+```json
+{"version":0,"username":"member_login","reason":"测试账号清理"}
+```
+
+需输入目标成员的准确登录账号确认。不允许自删或删除存在待审批申请的成员；版本冲突返回 409。成功后逻辑删除并撤销登录，保留业务历史；GET `/users` 不再返回该成员，编辑和密码重置返回 404，原登录账号名称保持占用。
+
+## 个人资料与密码
 
 PUT /profile：`{"name":"姓名","email":"name@example.com","phone":"123456","version":0}`。
 
-POST /profile/password：`{"currentPassword":"当前密码","newPassword":"新的至少12位密码"}`。新密码不能与旧密码相同，UTF-8 不超过 72 字节。请勿把真实密码写入脚本、日志或示例文件。
+POST /profile/password：`{"currentPassword":"当前密码","newPassword":"新的至少8位密码"}`。新密码不能与旧密码相同，UTF-8 不超过 72 字节。请勿把真实密码写入脚本、日志或示例文件。

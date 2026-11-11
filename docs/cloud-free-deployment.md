@@ -1,6 +1,6 @@
-# 免费云部署：wszjj.me
+# 免费云部署：example.com
 
-当前确定的方案：保留 Java，使用 Render 免费 Web Service + Neon 免费 PostgreSQL，Cloudflare 管理域名入口。目标子域名为 `erp.wszjj.me`，以免占用现有根域名。账号仍由本人登录授权，不把密码、API Token、数据库连接密钥写入 GitHub。
+当前确定的方案：保留 Java，使用 Render 免费 Web Service + Neon 免费 PostgreSQL，Cloudflare 管理域名入口。目标子域名为 `erp.example.com`，以免占用现有根域名。账号仍由本人登录授权，不把密码、API Token、数据库连接密钥写入 GitHub。
 
 **当前是部署准备文件，不表示网站已经上线。** `render.yaml` 不会在本机自动创建任何云资源，也不会自动改 DNS 或上传本地数据库。
 
@@ -53,7 +53,7 @@
 | DB_URL | `jdbc:postgresql://实际主机/实际数据库?sslmode=verify-full`，不在 URL 中拼入密码 |
 | DB_USER | Neon 给出的数据库用户名 |
 | DB_PASSWORD | Neon 数据库密码，仅在 Render 私密环境变量填写 |
-| BOOTSTRAP_ADMIN_PASSWORD | 自己设置至少 12 字符、最多 72 UTF-8 字节的新密码；不能使用演示密码 |
+| BOOTSTRAP_ADMIN_PASSWORD | 自己设置至少 8 字符、最多 72 UTF-8 字节的新密码；不能使用演示密码 |
 
 首次在空库启动只会创建 `admin`，不创建演示账号和演示业务数据。管理员初始密码变量只在没有用户时生效，修改已有密码请通过个人中心操作。
 
@@ -75,7 +75,7 @@
 
 ## 5. 接入 Cloudflare 与阿里云域名
 
-若 `wszjj.me` 尚未接入 Cloudflare：
+若 `example.com` 尚未接入 Cloudflare：
 
 1. 在 Cloudflare 添加已有域名，选择免费的域名/DNS计划。
 2. 对照阿里云原解析记录检查 A、AAAA、CNAME、MX、TXT，保留已有网站和邮箱记录；自动扫描不保证完整。
@@ -84,7 +84,7 @@
 
 网站子域名：
 
-1. 在 Render 为服务添加 Custom Domain：`erp.wszjj.me`。
+1. 在 Render 为服务添加 Custom Domain：`erp.example.com`。
 2. 在 Cloudflare 为 `erp` 创建 CNAME，目标填写 Render **实际服务**的 `*.onrender.com` 主机名。
 3. 初次验证保持 DNS only，先完成 Render 域名验证和证书签发。只处理 `erp` 同名冲突记录，不删除根域名、邮箱或其他子域名记录。
 4. 证书有效后如需启用 Cloudflare 代理，再启用 Proxied，使用 Full (strict)；不要用 Flexible。

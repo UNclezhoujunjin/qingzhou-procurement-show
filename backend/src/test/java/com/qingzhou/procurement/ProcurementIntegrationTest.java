@@ -59,13 +59,13 @@ class ProcurementIntegrationTest {
         mvc.perform(get("/api/audit").with(user("employee"))).andExpect(status().isForbidden());
         mvc.perform(get("/api/orders").with(user("employee"))).andExpect(status().isForbidden());
         mvc.perform(post("/api/inventory/issue").with(user("employee")).with(csrf()).header("Idempotency-Key",UUID.randomUUID().toString())
-            .contentType("application/json").content("{\"productId\":1,\"quantity\":1,\"reason\":\"越权领用\"}"))
+            .contentType("application/json").content("{\"approverId\":1,\"productId\":1,\"quantity\":1,\"reason\":\"越权领用\"}"))
             .andExpect(status().isForbidden());
     }
 
     @Test void completeFlowAndRepeatedReceiptKeepStockConsistent() throws Exception {
         String key=UUID.randomUUID().toString();
-        String body="{\"productId\":1,\"quantity\":3,\"reason\":\"集成测试工位采购\"}";
+        String body="{\"approverId\":3,\"productId\":1,\"quantity\":3,\"reason\":\"集成测试工位采购\"}";
         var created=mvc.perform(post("/api/requests").with(user("employee")).with(csrf()).header("Idempotency-Key",key)
             .contentType("application/json").content(body)).andExpect(status().isOk()).andReturn();
         String requestId=json.readTree(created.getResponse().getContentAsString()).get("id").asText();
@@ -90,7 +90,10 @@ class ProcurementIntegrationTest {
     }
 
     @Test void selfApprovalAndIllegalTransitionsAreRejected() {
-        var created=service.createRequest(admin,new ApiController.RequestInput(1,1,"管理员申请"),UUID.randomUUID().toString());
+        String reviewer="reviewer_"+UUID.randomUUID().toString().substring(0,8);
+        db.update("INSERT INTO app_user(username,password_hash,display_name,department,role) SELECT ?,password_hash,'审批管理员','管理中心','ADMIN' FROM app_user WHERE id=1",reviewer);
+        long reviewerId=db.queryForObject("SELECT id FROM app_user WHERE username=?",Long.class,reviewer);
+        var created=service.createRequest(admin,new ApiController.RequestInput(1L,1,"管理员申请",null,reviewerId),UUID.randomUUID().toString());
         var error=assertThrows(BusinessError.class,()->service.review(admin,created.get("id").toString(),new ApiController.ReviewInput("APPROVED","",0)));
         assertEquals(403,error.status);
         var transition=assertThrows(BusinessError.class,()->service.order(admin,created.get("id").toString()));
@@ -128,7 +131,7 @@ class ProcurementIntegrationTest {
 
     @Test void invalidInputCannotCreateNegativeQuantity() throws Exception {
         mvc.perform(post("/api/requests").with(user("employee")).with(csrf()).header("Idempotency-Key",UUID.randomUUID().toString())
-            .contentType("application/json").content("{\"productId\":1,\"quantity\":-2,\"reason\":\"无效输入\"}"))
+            .contentType("application/json").content("{\"approverId\":1,\"productId\":1,\"quantity\":-2,\"reason\":\"无效输入\"}"))
             .andExpect(status().isBadRequest());
     }
 

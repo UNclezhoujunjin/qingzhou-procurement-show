@@ -27,6 +27,11 @@ class Writes {
         db.update("INSERT INTO idempotency_record(actor_id,operation,request_key,fingerprint,resource_id) VALUES (?,?,?,?,?)",a.id(),op,key,hash,resource);
         return null;
     }
+    void reconcileRequest(String id) {
+        long active=db.queryForObject("SELECT COUNT(*) FROM purchase_order WHERE request_id=? AND lifecycle_state='ACTIVE' AND status<>'RECEIVED'",Long.class,id);
+        long closed=db.queryForObject("SELECT COUNT(*) FROM purchase_order WHERE request_id=? AND lifecycle_state<>'ACTIVE'",Long.class,id);
+        db.update("UPDATE purchase_request SET status=?,lifecycle_state=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",active==0?"RECEIVED":"ORDERED",active==0&&closed>0?"CLOSED":"ACTIVE",id);
+    }
     void audit(Account a,String action,String target,String detail) {
         db.update("INSERT INTO audit_log(actor_id,action,target,detail) VALUES (?,?,?,?)",a.id(),action,target,Notifications.clip(detail,500));
     }

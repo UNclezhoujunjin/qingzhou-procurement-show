@@ -10,7 +10,7 @@ services:
     dockerContext: .
     healthCheckPath: /actuator/health
     domains:
-      - erp.wszjj.me
+      - erp.example.com
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: cloud

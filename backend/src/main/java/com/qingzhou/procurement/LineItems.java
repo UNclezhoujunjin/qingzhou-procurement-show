@@ -29,7 +29,7 @@ class LineItems {
         for(var line:lines) {
             var rows=db.queryForList("SELECT * FROM product WHERE id=? FOR UPDATE",line.productId());
             if(rows.isEmpty())throw new BusinessError(404,"采购商品不存在");
-            var p=rows.get(0);String id=UUID.randomUUID().toString();
+            var p=rows.get(0);if(Boolean.FALSE.equals(p.get("enabled")))throw new BusinessError(409,"商品已停用，请重新选择");String id=UUID.randomUUID().toString();
             db.update("INSERT INTO request_line(id,request_id,product_id,supplier_id,product_name,sku,unit,quantity,unit_price) VALUES (?,?,?,?,?,?,?,?,?)",
                 id,request,line.productId(),p.get("supplier_id"),p.get("name"),p.get("sku"),p.get("unit"),line.quantity(),p.get("price"));
             result.add(p);
@@ -44,8 +44,23 @@ class LineItems {
     }
     Map<String,Object> request(Map<String,Object> row) {return decorate(row,requests(row.get("id").toString()));}
     Map<String,Object> order(Map<String,Object> row) {return decorate(row,orders(row.get("id").toString()));}
+    void batch(List<Map<String,Object>> rows,boolean orders) {
+        if(rows.isEmpty())return;
+        String marks=String.join(",",Collections.nCopies(rows.size(),"?"));
+        String sql=orders
+            ? "SELECT l.*,l.quantity*l.unit_price AS amount,l.received_quantity-l.returned_quantity AS net_received,l.quantity-l.received_quantity+l.returned_quantity AS remaining FROM order_line l WHERE l.order_id IN ("+marks+") ORDER BY l.product_id"
+            : "SELECT l.*,l.quantity*l.unit_price AS amount,s.name AS supplier_name FROM request_line l JOIN supplier s ON s.id=l.supplier_id WHERE l.request_id IN ("+marks+") ORDER BY l.product_id";
+        var grouped=new HashMap<String,List<Map<String,Object>>>();
+        for(var line:db.queryForList(sql,rows.stream().map(r->r.get("id")).toArray()))
+            grouped.computeIfAbsent(line.get(orders?"order_id":"request_id").toString(),k->new ArrayList<>()).add(line);
+        for(var row:rows)decorate(row,grouped.getOrDefault(row.get("id").toString(),List.of()));
+    }
     private Map<String,Object> decorate(Map<String,Object> row,List<Map<String,Object>> lines) {
         row.put("lines",lines);
+        if(row.get("lifecycle_state")!=null&&!row.get("lifecycle_state").equals("ACTIVE")){
+            if(row.containsKey("fulfillment_status"))row.put("fulfillment_status",row.get("lifecycle_state"));
+            else row.put("status",row.get("lifecycle_state"));
+        }
         if(!lines.isEmpty()) {
             row.put("amount",lines.stream().map(l->(BigDecimal)l.get("amount")).reduce(BigDecimal.ZERO,BigDecimal::add));
             row.put("product_name",lines.get(0).get("product_name")+(lines.size()>1?" 等 "+lines.size()+" 项":""));

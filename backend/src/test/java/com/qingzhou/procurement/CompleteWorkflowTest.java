@@ -105,13 +105,13 @@ class CompleteWorkflowTest {
         mvc.perform(get("/api/inventory/issues").with(user("employee"))).andExpect(status().isForbidden());
         mvc.perform(get("/api/inventory/counts").with(user("buyer"))).andExpect(status().isForbidden());
         mvc.perform(get("/api/admin/backups").with(user("warehouse"))).andExpect(status().isForbidden());
-        mvc.perform(post("/api/inventory/counts").with(user("warehouse")).with(csrf()).contentType("application/json").content("{\"lines\":[{\"productId\":1,\"countedQuantity\":-1,\"stockVersion\":0}],\"reason\":\"invalid\"}"))
+        mvc.perform(post("/api/inventory/counts").with(user("warehouse")).with(csrf()).contentType("application/json").content("{\"lines\":[{\"approverId\":1,\"productId\":1,\"countedQuantity\":-1,\"stockVersion\":0}],\"reason\":\"invalid\"}"))
             .andExpect(status().isBadRequest());
     }
 
     @Test void notificationsArePersonalAndReadActionsAreScoped() throws Exception {
         var request=procurement.createRequest(employee,new ApiController.RequestInput(product(1,0),1,"通知测试"),key());
-        String notice=db.queryForObject("SELECT id FROM app_notification WHERE user_id=1 AND body=?",String.class,request.get("number"));
+        String notice=db.queryForObject("SELECT id FROM app_notification WHERE user_id=1 AND target_id=?",String.class,request.get("id"));
         mvc.perform(post("/api/notifications/"+notice+"/read").with(user("employee")).with(csrf())).andExpect(status().isNotFound());
         assertNull(db.queryForObject("SELECT read_at FROM app_notification WHERE id=?",java.sql.Timestamp.class,notice));
         mvc.perform(post("/api/notifications/"+notice+"/read").with(user("admin")).with(csrf())).andExpect(status().isOk());
@@ -121,24 +121,24 @@ class CompleteWorkflowTest {
         for(var row:(List<?>)notifications.inbox(employee,1,100,false).get("items"))assertEquals(2L,((Number)((Map<?,?>)row).get("user_id")).longValue());
     }
 
-    @Test void profileUpdatesOnlyPersonalFieldsAndSignsOutExistingSessions() throws Exception {
+    @Test void profileUpdatesOnlyPersonalFieldsAndKeepsExistingSessions() throws Exception {
         String username=newUser();var session=login(username,"TestAccount@2026");var idle=login(username,"TestAccount@2026");
         mvc.perform(put("/api/profile").session(session).with(csrf()).contentType("application/json")
             .content("{\"name\":\"新名字\",\"email\":\"test@example.com\",\"phone\":\"123456\",\"version\":0,\"role\":\"ADMIN\"}"))
-            .andExpect(status().isOk());assertTrue(session.isInvalid());
-        mvc.perform(get("/api/profile").session(idle)).andExpect(status().isUnauthorized());
+            .andExpect(status().isOk());assertFalse(session.isInvalid());
+        mvc.perform(get("/api/profile").session(idle)).andExpect(status().isOk());
         mvc.perform(get("/api/profile").session(login(username,"TestAccount@2026"))).andExpect(jsonPath("$.role").value("EMPLOYEE")).andExpect(jsonPath("$.display_name").value("新名字"));
     }
 
     @Test void passwordChangeRequiresOldPasswordAndRevokesAllOldLogins() throws Exception {
         String username=newUser();var session=login(username,"TestAccount@2026");var idle=login(username,"TestAccount@2026");
         mvc.perform(post("/api/profile/password").session(session).with(csrf()).contentType("application/json")
-            .content("{\"currentPassword\":\"wrong\",\"newPassword\":\"NewPassword@2026!\"}")).andExpect(status().isBadRequest());
+            .content("{\"currentPassword\":\"wrong\",\"newPassword\":\"NewPass!\"}")).andExpect(status().isBadRequest());
         mvc.perform(post("/api/profile/password").session(session).with(csrf()).contentType("application/json")
-            .content("{\"currentPassword\":\"TestAccount@2026\",\"newPassword\":\"NewPassword@2026!\"}")).andExpect(status().isOk());
+            .content("{\"currentPassword\":\"TestAccount@2026\",\"newPassword\":\"NewPass!\"}")).andExpect(status().isOk());
         assertTrue(session.isInvalid());mvc.perform(get("/api/products").session(idle)).andExpect(status().isUnauthorized());
         mvc.perform(post("/api/auth/login").with(csrf()).param("username",username).param("password","TestAccount@2026")).andExpect(status().isUnauthorized());
-        assertNotNull(login(username,"NewPassword@2026!"));
+        assertNotNull(login(username,"NewPass!"));
         assertFalse(db.queryForObject("SELECT password_hash FROM app_user WHERE username=?",String.class,username).contains("NewPassword"));
     }
 
